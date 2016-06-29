@@ -1,0 +1,252 @@
+---
+title: "Social Network Analysis <br/> Home Assignment 2"
+author: 'Chagaev Vladislav'
+date: "due date - 29.05.2016 23:59"
+output:
+  pdf_document:
+    latex_engine: xelatex
+    toc: yes
+  html_document:
+    toc: yes
+---
+# Graph models. Centrality metrics
+Please send your reports to network.hse.2016@gmail.com with the subject of of the following structure:<br/>
+*[MAGOLEGO SNA 2016] {LastName} {First Name} HA{Number}*
+
+Late submission policy: -1 point per day
+
+Use this file as a template for your report.\
+Support your computations with figures and comments. Send ONLY .Rmd versions of your report with datasets for your social network. Anonymize your data if necessary.
+
+```{r, echo=FALSE}
+library(igraph)
+library(rgexf)
+library(ggplot2)
+library(R.matlab)
+```
+
+
+## Task 1. Your social network
+
+For the first task, you have to load your [vk.com](http://vk.com) network. Please follow the instructions posted on the course wiki or user [VK Application](vk.com/app3861133). For [FB](http://facebook.com) users try to use [NetVizz](http://thepoliticsofsystems.net/2010/03/netvizz-facebook-to-gephi/). If you did it correctly, you should have a GraphML file with your own network. Read it to R:
+
+```{r}
+src = read.gexf("vk-friends-9475706.gexf")
+friends_graph <- gexf.to.igraph(src)
+
+```
+
+### 1. Degree distribution
+
+First, plot degree distribution of your network in log-log scales:
+
+```{r}
+degree_dist <- degree.distribution(friends_graph, cumulative = TRUE)
+plot(degree_dist, log="xy", main = "Cumulative degree distribution of my network", xlab = "friend degree (log)", ylab = "frequency (log)")
+
+```
+
+Is there any correspondence between actual degree distribution of your network and the Power Law distribution? If not, explain why.
+
+Yes, it is.
+
+Now, let's see how it would look if it was random. Produce Erdos-Renyi graph matching your real network (same number of nodes and same average degree). Compare it with your degree distribution.
+
+```{r}
+mean_degree <- mean(degree(friends_graph))
+c <- vcount(friends_graph)
+rnd <- erdos.renyi.game(c, mean_degree/c/2, type = "gnp", directed = TRUE)
+rnd_dist <- degree.distribution(rnd, cumulative = TRUE)
+plot(rnd_dist, log="xy", main = "Cumulative degree distribution of random network", xlab = "friend degree (log)", ylab = "frequency (log)")
+```
+
+My network distribution has a lot of vertices with degree more than 50 and maximum degree is around 200. Random network has more nodes with relatively small degree (~less than 30)
+
+### 2. Compute centrality metrics
+
+Compute for your network: 
+
+* degree centrality
+
+* closeness centrality
+
+* betweenness centrality
+
+* eigenvector centrality
+
+* Bonacich power centrality
+
+* Alpha centrality
+
+
+```{r}
+centralization.degree(friends_graph)$centralization
+
+centralization.closeness(friends_graph, mode="all")$centralization
+
+centralization.betweenness (friends_graph, directed = TRUE, nobigint = TRUE)$centralization
+
+centralization.evcent (friends_graph, directed = TRUE, scale = FALSE, options = igraph.arpack.default)$centralization
+
+
+
+```
+
+Output six plots corresponding to six centrality metrics you've computed: 
+
+* Use first names of your friends as node labels on the graph (you may hide this information if you wish -- change it by integer ID)
+* Keep the same layout of the network
+* Make node sizes and colours proportional to the respective centrality metrics
+
+Hint: If you get stuck, lab 4 script might be helpful.
+
+```{r fig.width = 10, fig.height = 10}
+deg<-degree(friends_graph)
+lay <- layout.fruchterman.reingold(friends_graph)
+fine = 500
+palette2 <- colorRampPalette(c('blue','red'))
+degCol <- palette2(fine)[as.numeric(cut(deg,breaks = fine))]
+vert_size <- ifelse(deg>50, 1/50*deg, 1)
+par(mfrow=c(1,1))
+plot(friends_graph, layout=lay, vertex.color=degCol, vertex.size=vert_size, vertex.label=NA, edge.width = 0.5, edge.arrow.size = 0.5, main="Degree centrality")
+
+```
+
+```{r fig.width = 10, fig.height = 10}
+clos=closeness(friends_graph)
+closCol = palette2(fine)[as.numeric(cut(clos,breaks = fine))]
+
+plot(friends_graph,layout = lay, vertex.label=NA, vertex.color=closCol, vertex.size=clos*15000, edge.width = 0.5, edge.arrow.size = 0.5, main="Closeness centrality")
+```
+
+```{r fig.width = 10, fig.height = 10}
+betw <- betweenness(friends_graph)
+betwCol = palette2(fine)[as.numeric(cut(betw,breaks = fine))]
+vert_size <- ifelse(betw>4000, 1/4000*betw, 1)
+plot(friends_graph,layout = lay, vertex.color=betwCol, vertex.size=vert_size, vertex.label=NA, edge.width = 0.5, edge.arrow.size = 0.5, main="Betwenness centrality")
+```
+
+```{r fig.width = 10, fig.height = 10}
+ev <- evcent(friends_graph)$vector
+evCol = palette2(fine)[as.numeric(cut(ev,breaks = fine))]
+vert_size <- ifelse(ev>0.2, 5*ev, 0.8)
+plot(friends_graph,layout = lay, vertex.size=vert_size, vertex.color=evCol, vertex.label=NA, edge.width = 0.5, edge.arrow.size = 0.5, main="Eigenvector centrality")
+
+```
+
+Now, output top ten nodes in each ranking. Again, print only first names in your table to keep privacy:
+
+```{r}
+## Put your code here
+sort(deg, decreasing = TRUE)[1:10]
+sort(clos, decreasing = TRUE)[1:10]
+sort(betw, decreasing = TRUE)[1:10]
+sort(ev, decreasing = TRUE)[1:10]
+```
+
+In general, the result was expected, because I lived in several cities so there are some well-known people which I and my friends know. Also I have a lot of common friends with my wife because we were classmates. Closeness is almost the same for a lot of my friends. I did not manage with Bonacich and alpha.
+
+
+## Task 2. Flickr network
+
+In the second task, you will work with a large directed graph. 
+
+Please download [flickr.mat](http://www.hse.ru/data/2015/05/01/1098247366/flickr.mat) 
+
+*Data contains sparse matrix A and list of user names. This is a denser part of the Flickr photo sharing site friendship graph from 2006. Edge direction corresponds to friendship requests (following). Some of the links are reciprocal, others not*
+
+It's a Matlab file. How to deal with it in R? There is a package `R.matlab`. Please install it and call `library(R.matlab)`
+
+Now use `readMat` function to read the file and extract adjacency matrix and a list of user names:
+
+```{r}
+flickr <- readMat("flickr.mat")
+fmatrix <- as.matrix(flickr[1]$A)
+fnames=flickr[2]$names
+```
+
+Look at user names. You might want to remove spaces from the names. Use a function `gsub` to remove them:
+
+```{r}
+fnames=gsub(" ", "", fnames)
+```
+
+Now create a graph, output the number of vertices and edges:
+
+```{r}
+flicker_graph <- graph.adjacency(fmatrix, mode = "directed", weighted = NULL)
+vcount(flicker_graph)
+ecount(flicker_graph)
+
+```
+
+Compute in- and out- degree centralities, PageRank, Hubs and Authorities for this network:
+
+```{r}
+cdi <-centralization.degree(flicker_graph, mode = "in")$centralization
+
+cdo <-centralization.degree(flicker_graph, mode = "out")$centralization
+
+pr <- page.rank(flicker_graph)$vector
+
+h <- hub.score(flicker_graph)$vector
+
+auth <- authority.score(flicker_graph)$vector
+
+
+```
+
+Print top ten names in each ranking:
+
+```{r}
+deg_in<-degree(flicker_graph, mode = "in")
+top_in <- sort(deg_in, decreasing = TRUE)[1:10]
+fnames[which(deg_in %in% top_in)]
+
+deg_out=degree(flicker_graph, mode = "out")
+top_out <- sort(deg_out, decreasing = TRUE)[1:10]
+fnames[which(deg_out %in% top_out)]
+
+top_pr <- sort(pr, decreasing = TRUE)[1:10]
+fnames[which(pr %in% top_pr)]
+
+top_hub <- sort(h, decreasing = TRUE)[1:10]
+fnames[which(h %in% top_hub)]
+
+top_auth <- sort(auth, decreasing = TRUE)[1:10]
+fnames[which(auth %in% top_auth)]
+
+```
+
+Produce the following plots:
+
+* In-degree centralities versus out-degree centralities
+
+* In-degree centralities versus authorities
+
+* Out-degree centralities versus hubs
+
+* Hubs versus authorities
+
+* PageRank versus hubs
+
+* PageRank versus authorities
+
+
+```{r}
+par(mfrow = c(2, 3)) 
+plot(deg_in, deg_out, col="blue", xlab = "In degree", ylab = "Out degree")
+plot(deg_in, auth, col="blue", xlab = "In degree", ylab = "Authority")
+plot(deg_out, h, col="blue", xlab = "Out degree", ylab = "Hubs")
+plot(h, auth, col="blue", xlab = "Hubs", ylab = "Authority")
+plot(pr, h, col="blue", xlab = "Page Rank", ylab = "Hubs")
+plot(pr, auth, col="blue", xlab = "Page Rank", ylab = "Authority")
+
+```
+
+1)You have to follow at least several people in order to be popular but it is not the rule. There are a lot of people who follow a lot of other people and they follow in response.
+2)Than more out degree then more hub is.
+3)Authority depends on in degree and vice versa.
+4)A lot of hubs don't have authority.
+5)In general, big hub has low page rank.
+6)Page rank depends on Authority and vice versa.
